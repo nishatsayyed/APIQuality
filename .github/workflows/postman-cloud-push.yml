@@ -1,0 +1,28 @@
+name: Push Postman Workspace to Cloud
+
+on:
+  push:
+    branches:
+      - main
+
+jobs:
+  postman-push:
+    runs-on: ubuntu-latest
+    env:
+      POSTMAN_CHANNEL: beta
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Add Postman CLI to PATH
+        run: echo "$HOME/.postman" >> $GITHUB_PATH
+
+      - name: Install Postman CLI
+        run: curl -o- "https://dl-cli.pstmn-beta.io/install/unix.sh" | sh
+
+      - name: Authenticate Postman CLI
+        run: postman login --with-api-key ${{ secrets.POSTMAN_API_KEY }}
+
+      - name: Push workspace to Postman Cloud
+        run: postman workspace push --yes

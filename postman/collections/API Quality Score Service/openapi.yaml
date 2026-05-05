@@ -1,0 +1,166 @@
+openapi: 3.0.3
+info:
+  title: API Quality Score Service
+  description: |
+    Collection that documents and exercises the local API Quality Score Service running at http://localhost:3000.
+    This OpenAPI spec was generated from the Postman collection.
+  version: '1.0.0'
+servers:
+  - url: 'http://localhost:3000'
+paths:
+  /health:
+    get:
+      summary: Health Check
+      responses:
+        '200':
+          description: Service is healthy
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  status:
+                    type: string
+                  time:
+                    type: string
+  /:
+    get:
+      summary: Get Service Info
+      responses:
+        '200':
+          description: Service info
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  name:
+                    type: string
+                  endpoints:
+                    type: array
+                    items:
+                      type: string
+  /score:
+    post:
+      summary: Score Collection (JSON or YAML)
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                info:
+                  type: object
+                auth:
+                  type: object
+                item:
+                  type: array
+                  items:
+                    type: object
+          application/x-yaml:
+            schema:
+              type: object
+      responses:
+        '200':
+          description: Scoring result
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  report:
+                    type: object
+                    properties:
+                      overallScore:
+                        type: number
+                      grade:
+                        type: string
+                      categories:
+                        type: array
+                        items:
+                          type: object
+                      collectionName:
+                        type: string
+                  inputFormat:
+                    type: string
+        '400':
+          description: Invalid input
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  error:
+                    type: string
+  /score/summary:
+    post:
+      summary: Score Collection Summary (JSON or YAML)
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                info:
+                  type: object
+                auth:
+                  type: object
+                item:
+                  type: array
+                  items:
+                    type: object
+          application/x-yaml:
+            schema:
+              type: object
+      responses:
+        '200':
+          description: Scoring summary
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  overallScore:
+                    type: number
+                  grade:
+                    type: string
+                  categories:
+                    type: array
+                    items:
+                      type: object
+                  summary:
+                    type: object
+                  collectionName:
+                    type: string
+        '400':
+          description: Invalid input
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  error:
+                    type: string
+  /score/categories:
+    get:
+      summary: List Scoring Categories
+      responses:
+        '200':
+          description: List of scoring categories and grade bands
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  categories:
+                    type: array
+                    items:
+                      type: object
+                  gradeBands:
+                    oneOf:
+                      - type: array
+                        items:
+                          type: object
+                      - type: object

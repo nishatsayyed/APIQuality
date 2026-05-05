@@ -1,0 +1,1315 @@
+openapi: 3.0.0
+info:
+  title: API Quality Score Service
+  version: 1.0.0
+  description: |-
+    Scores Postman v3 collections across six quality dimensions and returns
+    an overall grade (A–F) plus per-category findings and recommendations.
+
+    **Supported input formats**
+    - `application/json` – raw v3 collection object, or a wrapped payload
+      `{ "format": "json"|"yaml"|"auto", "collection": <object|string> }`
+    - `application/x-yaml` / `text/yaml` / `text/plain` – raw YAML collection
+
+    **Scoring categories** (weights sum to 1.0)
+    | Category | Weight |
+    |---|---|
+    | Endpoint Structure & Naming | 0.15 |
+    | Parameter & Description Annotations | 0.15 |
+    | Authentication & Security | 0.20 |
+    | Best Practices (variables, examples, consistency) | 0.20 |
+    | Tests & Coverage | 0.20 |
+    | Documentation Depth | 0.10 |
+
+    **Grade bands**: A ≥ 90 · B ≥ 75 · C ≥ 60 · D ≥ 40 · F < 40
+servers:
+  - url: 'http://localhost:3000'
+    description: Local development server
+tags:
+  - name: Service Info
+    description: Liveness and discovery endpoints.
+  - name: Scoring Metadata
+    description: Static metadata about scoring categories and grade bands.
+  - name: Score Collection (JSON)
+    description: Score a Postman v3 collection supplied as JSON.
+  - name: Score Collection (YAML)
+    description: Score a Postman v3 collection supplied as YAML text.
+  - name: Error Cases
+    description: Illustrative error responses returned for invalid input.
+paths:
+  /:
+    get:
+      summary: Get Service Info
+      description: |-
+        Returns the service name, a short description, and a list of all
+        available endpoints with their HTTP method and purpose.
+      operationId: getServiceInfo
+      tags:
+        - Service Info
+      responses:
+        '200':
+          description: Service discovery payload.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ServiceInfo'
+              example:
+                name: api-quality-score-service
+                description: >-
+                  Compute API quality scores for Postman v3 collections.
+                  POST a v3 collection (JSON or YAML) to /score.
+                endpoints:
+                  - method: GET
+                    path: /health
+                    description: Health probe
+                  - method: GET
+                    path: /score/categories
+                    description: List scoring categories & weights
+                  - method: POST
+                    path: /score
+                    description: Full quality report for a v3 collection
+                  - method: POST
+                    path: /score/summary
+                    description: Compact summary of the quality score
+  /health:
+    get:
+      summary: Health Check
+      description: |-
+        Liveness probe. Returns `{ "status": "ok" }` and the current server
+        timestamp. Use this to verify the service is running before sending
+        scoring requests.
+      operationId: healthCheck
+      tags:
+        - Service Info
+      responses:
+        '200':
+          description: Service is healthy.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HealthResponse'
+              example:
+                status: ok
+                time: '2026-05-05T07:00:00.000Z'
+  /score/categories:
+    get:
+      summary: List Scoring Categories
+      description: |-
+        Returns the static list of scoring categories (with their IDs, human
+        labels, and weights) and the grade-band thresholds used to convert a
+        numeric score into a letter grade.  Weights always sum to exactly 1.0.
+      operationId: listScoringCategories
+      tags:
+        - Scoring Metadata
+      responses:
+        '200':
+          description: Scoring categories and grade bands.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/CategoriesResponse'
+              example:
+                categories:
+                  - id: endpoint_structure
+                    label: 'Endpoint Structure & Naming'
+                    weight: 0.15
+                  - id: annotations
+                    label: 'Parameter & Description Annotations'
+                    weight: 0.15
+                  - id: auth
+                    label: 'Authentication & Security'
+                    weight: 0.20
+                  - id: best_practices
+                    label: 'Best Practices (variables, examples, consistency)'
+                    weight: 0.20
+                  - id: tests
+                    label: 'Tests & Coverage'
+                    weight: 0.20
+                  - id: documentation
+                    label: Documentation Depth
+                    weight: 0.10
+                gradeBands:
+                  - grade: A
+                    min: 90
+                  - grade: B
+                    min: 75
+                  - grade: C
+                    min: 60
+                  - grade: D
+                    min: 40
+                  - grade: F
+                    min: 0
+  /score:
+    post:
+      summary: Score Collection – Full Report
+      description: |-
+        Accepts a Postman v3 collection and returns a **full quality report**
+        containing the overall score, letter grade, a summary of findings, all
+        six category results (each with individual findings and metrics), and
+        up to five prioritised recommendations.
+
+        **Request body variants**
+        1. **Raw JSON collection** (`application/json`) – send the collection
+           object directly as the request body.
+        2. **Wrapped JSON payload** (`application/json`) – send
+           `{ "format": "json"|"yaml"|"auto", "collection": <object|string> }`.
+        3. **Raw YAML collection** (`application/x-yaml` or `text/yaml`) –
+           send the collection serialised as YAML text.
+      operationId: scoreCollectionFull
+      tags:
+        - Score Collection (JSON)
+        - Score Collection (YAML)
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              oneOf:
+                - $ref: '#/components/schemas/V3Collection'
+                - $ref: '#/components/schemas/WrappedCollectionPayload'
+            examples:
+              rawJsonCollection:
+                summary: Raw JSON collection (direct body)
+                value:
+                  info:
+                    name: Sample Pets API
+                    description: A tiny sample collection for quality scoring.
+                  auth:
+                    type: bearer
+                    bearer:
+                      - key: token
+                        value: '{{apiToken}}'
+                  item:
+                    - name: List Pets
+                      request:
+                        method: GET
+                        url: 'https://api.example.com/pets?limit=10'
+                        description: Returns a paginated list of pets.
+                        header:
+                          - key: Accept
+                            value: application/json
+                            description: Response content type
+                      event:
+                        - listen: test
+                          script:
+                            exec:
+                              - 'pm.test(''status is 200'', () => pm.response.to.have.status(200));'
+                              - 'pm.test(''body is array'', () => pm.expect(pm.response.json()).to.be.an(''array''));'
+                    - name: Create Pet
+                      request:
+                        method: POST
+                        url: 'https://api.example.com/pets'
+                        description: Creates a new pet.
+                        header:
+                          - key: Content-Type
+                            value: application/json
+                        body:
+                          mode: raw
+                          raw: '{"name":"Rex","species":"dog"}'
+                      event:
+                        - listen: test
+                          script:
+                            exec:
+                              - 'pm.test(''status is 201'', () => pm.response.to.have.status(201));'
+              wrappedJsonPayload:
+                summary: Wrapped JSON payload (collection nested under "collection" key)
+                value:
+                  format: json
+                  collection:
+                    info:
+                      name: Wrapped Sample
+                    item: []
+          application/x-yaml:
+            schema:
+              type: string
+              description: |-
+                A complete Postman v3 collection serialised as YAML text.
+                The service accepts `application/x-yaml`, `text/yaml`, and
+                `text/plain` content types for YAML payloads.
+            example: |-
+              info:
+                name: Sample Pets API
+                description: A tiny sample collection for quality scoring.
+              auth:
+                type: bearer
+                bearer:
+                  - key: token
+                    value: '{{apiToken}}'
+              item:
+                - name: List Pets
+                  request:
+                    method: GET
+                    url: 'https://api.example.com/pets?limit=10'
+                    description: Returns a paginated list of pets.
+                    header:
+                      - key: Accept
+                        value: application/json
+                        description: Response content type
+                  event:
+                    - listen: test
+                      script:
+                        exec:
+                          - 'pm.test(''status is 200'', () => pm.response.to.have.status(200));'
+      responses:
+        '200':
+          description: Full quality report computed successfully.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/FullScoreResponse'
+              example:
+                inputFormat: json
+                report:
+                  schema: v3
+                  collectionName: Sample Pets API
+                  overallScore: 62
+                  grade: C
+                  summary:
+                    endpoints: 2
+                    folders: 0
+                    totalFindings: 5
+                    errorFindings: 0
+                    warnFindings: 3
+                  categories:
+                    - id: endpoint_structure
+                      label: 'Endpoint Structure & Naming'
+                      weight: 0.15
+                      score: 80
+                      maxScore: 100
+                      findings: []
+                      metrics:
+                        endpoints: 2
+                        wellNamed: 2
+                        withMethod: 2
+                        withUrl: 2
+                        restfulPaths: 2
+                    - id: annotations
+                      label: 'Parameter & Description Annotations'
+                      weight: 0.15
+                      score: 75
+                      maxScore: 100
+                      findings:
+                        - level: info
+                          message: Missing description for header Accept
+                          path: List Pets
+                      metrics:
+                        totalParams: 2
+                        describedParams: 1
+                        endpointsWithDescription: 2
+                    - id: auth
+                      label: 'Authentication & Security'
+                      weight: 0.20
+                      score: 88
+                      maxScore: 100
+                      findings: []
+                      metrics:
+                        collectionAuth: bearer
+                        endpointsWithAuth: 2
+                        hardcodedCredentials: 0
+                        insecureSchemeEndpoints: 0
+                    - id: best_practices
+                      label: 'Best Practices (variables, examples, consistency)'
+                      weight: 0.20
+                      score: 40
+                      maxScore: 100
+                      findings:
+                        - level: info
+                          message: No collection variables defined. Use {{baseUrl}} and other vars to reduce duplication.
+                        - level: warn
+                          message: Raw body present but no Content-Type header
+                          path: Create Pet
+                      metrics:
+                        collectionVariables: 0
+                        endpointsUsingVariables: 0
+                        distinctHardcodedHosts: 1
+                        endpointsWithExamples: 0
+                        bodiesChecked: 1
+                        bodiesWithContentType: 0
+                    - id: tests
+                      label: 'Tests & Coverage'
+                      weight: 0.20
+                      score: 70
+                      maxScore: 100
+                      findings:
+                        - level: info
+                          message: Tests exist but no HTTP status assertion detected
+                          path: List Pets
+                      metrics:
+                        endpointsWithTests: 2
+                        endpointsWithStatusAssertion: 1
+                        endpointsWithMultipleAssertions: 1
+                        totalAssertions: 3
+                        hasCollectionLevelTest: false
+                    - id: documentation
+                      label: Documentation Depth
+                      weight: 0.10
+                      score: 55
+                      maxScore: 100
+                      findings: []
+                      metrics:
+                        collectionDescriptionLength: 44
+                        endpointsDescribed: 2
+                        averageEndpointDescriptionLength: 28
+                  topRecommendations:
+                    - 'Best Practices (variables, examples, consistency) (40/100): No collection variables defined. Use {{baseUrl}} and other vars to reduce duplication.'
+                    - 'Documentation Depth (55/100): Missing collection-level description'
+        '400':
+          description: |-
+            Invalid or unparseable request body.  Returned when the body is
+            empty, not valid JSON/YAML, or cannot be interpreted as a Postman
+            v3 collection.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+              examples:
+                emptyBody:
+                  summary: Empty / missing body
+                  value:
+                    error: Failed to compute score
+                    details: 'Unsupported or empty request body. Send JSON or YAML collection.'
+                invalidYaml:
+                  summary: Malformed YAML
+                  value:
+                    error: Failed to compute score
+                    details: 'YAMLException: unexpected end of the stream within a flow collection'
+  /score/summary:
+    post:
+      summary: Score Collection – Summary
+      description: |-
+        Same input as `POST /score` but returns a **compact summary** instead
+        of the full report.  The response includes the collection name, overall
+        score, letter grade, the findings summary counters, and per-category
+        scores (id, label, weight, score only — no individual findings or
+        metrics).  Use this endpoint when you only need the headline numbers.
+      operationId: scoreCollectionSummary
+      tags:
+        - Score Collection (JSON)
+        - Score Collection (YAML)
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              oneOf:
+                - $ref: '#/components/schemas/V3Collection'
+                - $ref: '#/components/schemas/WrappedCollectionPayload'
+            examples:
+              rawJsonCollection:
+                summary: Raw JSON collection (direct body)
+                value:
+                  info:
+                    name: Sample Pets API
+                    description: A tiny sample collection for quality scoring.
+                  auth:
+                    type: bearer
+                    bearer:
+                      - key: token
+                        value: '{{apiToken}}'
+                  item:
+                    - name: List Pets
+                      request:
+                        method: GET
+                        url: 'https://api.example.com/pets?limit=10'
+                        description: Returns a paginated list of pets.
+                        header:
+                          - key: Accept
+                            value: application/json
+                            description: Response content type
+                      event:
+                        - listen: test
+                          script:
+                            exec:
+                              - 'pm.test(''status is 200'', () => pm.response.to.have.status(200));'
+                              - 'pm.test(''body is array'', () => pm.expect(pm.response.json()).to.be.an(''array''));'
+                    - name: Create Pet
+                      request:
+                        method: POST
+                        url: 'https://api.example.com/pets'
+                        description: Creates a new pet.
+                        header:
+                          - key: Content-Type
+                            value: application/json
+                        body:
+                          mode: raw
+                          raw: '{"name":"Rex","species":"dog"}'
+                      event:
+                        - listen: test
+                          script:
+                            exec:
+                              - 'pm.test(''status is 201'', () => pm.response.to.have.status(201));'
+          application/x-yaml:
+            schema:
+              type: string
+              description: A complete Postman v3 collection serialised as YAML text.
+            example: |-
+              info:
+                name: Sample Pets API
+                description: A tiny sample collection for quality scoring.
+              item:
+                - name: List Pets
+                  request:
+                    method: GET
+                    url: 'https://api.example.com/pets?limit=10'
+      responses:
+        '200':
+          description: Compact summary of the quality score.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SummaryScoreResponse'
+              example:
+                collectionName: Sample Pets API
+                overallScore: 62
+                grade: C
+                summary:
+                  endpoints: 2
+                  folders: 0
+                  totalFindings: 5
+                  errorFindings: 0
+                  warnFindings: 3
+                categories:
+                  - id: endpoint_structure
+                    label: 'Endpoint Structure & Naming'
+                    weight: 0.15
+                    score: 80
+                  - id: annotations
+                    label: 'Parameter & Description Annotations'
+                    weight: 0.15
+                    score: 75
+                  - id: auth
+                    label: 'Authentication & Security'
+                    weight: 0.20
+                    score: 88
+                  - id: best_practices
+                    label: 'Best Practices (variables, examples, consistency)'
+                    weight: 0.20
+                    score: 40
+                  - id: tests
+                    label: 'Tests & Coverage'
+                    weight: 0.20
+                    score: 70
+                  - id: documentation
+                    label: Documentation Depth
+                    weight: 0.10
+                    score: 55
+        '400':
+          description: Invalid or unparseable request body.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+              example:
+                error: Failed to compute score
+                details: 'Unsupported or empty request body. Send JSON or YAML collection.'
+components:
+  schemas:
+    # ── Service Info ──────────────────────────────────────────────────────────
+    ServiceInfo:
+      type: object
+      description: Service discovery payload returned by `GET /`.
+      required:
+        - name
+        - description
+        - endpoints
+      properties:
+        name:
+          type: string
+          description: Machine-readable service identifier.
+          example: api-quality-score-service
+        description:
+          type: string
+          description: Human-readable summary of what the service does.
+          example: >-
+            Compute API quality scores for Postman v3 collections.
+            POST a v3 collection (JSON or YAML) to /score.
+        endpoints:
+          type: array
+          description: List of all available endpoints.
+          items:
+            $ref: '#/components/schemas/EndpointDescriptor'
+    EndpointDescriptor:
+      type: object
+      description: Metadata for a single service endpoint.
+      required:
+        - method
+        - path
+        - description
+      properties:
+        method:
+          type: string
+          description: HTTP method.
+          example: POST
+        path:
+          type: string
+          description: URL path relative to the server root.
+          example: /score
+        description:
+          type: string
+          description: Short description of what the endpoint does.
+          example: Full quality report for a v3 collection
+    HealthResponse:
+      type: object
+      description: Liveness probe response.
+      required:
+        - status
+        - time
+      properties:
+        status:
+          type: string
+          description: Always `"ok"` when the service is healthy.
+          enum:
+            - ok
+          example: ok
+        time:
+          type: string
+          format: date-time
+          description: Current server timestamp in ISO 8601 format.
+          example: '2026-05-05T07:00:00.000Z'
+    # ── Scoring Metadata ──────────────────────────────────────────────────────
+    CategoriesResponse:
+      type: object
+      description: Static scoring metadata.
+      required:
+        - categories
+        - gradeBands
+      properties:
+        categories:
+          type: array
+          description: The six scoring categories with their weights.
+          items:
+            $ref: '#/components/schemas/CategoryMeta'
+        gradeBands:
+          type: array
+          description: Grade thresholds in descending order.
+          items:
+            $ref: '#/components/schemas/GradeBand'
+    CategoryMeta:
+      type: object
+      description: Metadata for a single scoring category.
+      required:
+        - id
+        - label
+        - weight
+      properties:
+        id:
+          type: string
+          description: Machine-readable category identifier.
+          enum:
+            - endpoint_structure
+            - annotations
+            - auth
+            - best_practices
+            - tests
+            - documentation
+          example: endpoint_structure
+        label:
+          type: string
+          description: Human-readable category name.
+          example: 'Endpoint Structure & Naming'
+        weight:
+          type: number
+          format: float
+          description: Fractional weight used in the overall score calculation (all weights sum to 1.0).
+          minimum: 0
+          maximum: 1
+          example: 0.15
+    GradeBand:
+      type: object
+      description: Minimum score threshold for a letter grade.
+      required:
+        - grade
+        - min
+      properties:
+        grade:
+          type: string
+          description: Letter grade.
+          enum:
+            - A
+            - B
+            - C
+            - D
+            - F
+          example: B
+        min:
+          type: integer
+          description: Minimum overall score (0–100) required to achieve this grade.
+          minimum: 0
+          maximum: 100
+          example: 75
+    # ── Collection Input ──────────────────────────────────────────────────────
+    V3Collection:
+      type: object
+      description: |-
+        A Postman v3 collection object.  All fields are optional to allow
+        partial or minimal collections to be scored.
+      properties:
+        info:
+          type: object
+          description: Collection metadata.
+          properties:
+            name:
+              type: string
+              description: Collection name.
+              example: Sample Pets API
+            description:
+              type: string
+              description: Top-level collection description (plain text or Markdown).
+              example: A tiny sample collection for quality scoring.
+            schema:
+              type: string
+              description: Postman schema URL identifying the collection format version.
+              example: 'https://schema.getpostman.com/json/collection/v2.1.0/collection.json'
+            version:
+              type: string
+              description: Semantic version of the collection.
+              example: '1.0.0'
+        auth:
+          $ref: '#/components/schemas/V3Auth'
+        variable:
+          type: array
+          description: Collection-level variables.
+          items:
+            $ref: '#/components/schemas/V3Variable'
+        item:
+          type: array
+          description: Top-level folders and/or request items.
+          items:
+            $ref: '#/components/schemas/V3Item'
+        event:
+          type: array
+          description: Collection-level pre-request and test scripts.
+          items:
+            $ref: '#/components/schemas/V3Event'
+    WrappedCollectionPayload:
+      type: object
+      description: |-
+        Alternative JSON body format that wraps the collection under a
+        `collection` key.  Useful when the collection is already serialised
+        as a string (e.g. YAML text) and you want to specify the format
+        explicitly.
+      required:
+        - collection
+      properties:
+        format:
+          type: string
+          description: |-
+            Hint for the parser.  Use `"yaml"` when `collection` is a YAML
+            string, `"json"` when it is a JSON string, or `"auto"` (default)
+            to let the service detect the format automatically.
+          enum:
+            - json
+            - yaml
+            - auto
+          default: auto
+          example: json
+        collection:
+          description: The collection to score — either an object or a serialised string.
+          oneOf:
+            - $ref: '#/components/schemas/V3Collection'
+            - type: string
+              description: Collection serialised as a JSON or YAML string.
+    V3Auth:
+      type: object
+      description: Authentication configuration.
+      properties:
+        type:
+          type: string
+          description: Auth scheme identifier (e.g. `bearer`, `basic`, `apikey`, `noauth`).
+          example: bearer
+        bearer:
+          type: array
+          description: Bearer token key-value pairs (present when `type` is `"bearer"`).
+          items:
+            $ref: '#/components/schemas/KeyValuePair'
+        basic:
+          type: array
+          description: Basic auth key-value pairs (present when `type` is `"basic"`).
+          items:
+            $ref: '#/components/schemas/KeyValuePair'
+        apikey:
+          type: array
+          description: API key key-value pairs (present when `type` is `"apikey"`).
+          items:
+            $ref: '#/components/schemas/KeyValuePair'
+    V3Variable:
+      type: object
+      description: A collection-level variable.
+      properties:
+        key:
+          type: string
+          description: Variable name.
+          example: baseUrl
+        value:
+          description: Variable value (any scalar type).
+          example: 'http://localhost:3000'
+        type:
+          type: string
+          description: Variable type hint (e.g. `"string"`, `"secret"`).
+          example: string
+        description:
+          type: string
+          description: Human-readable description of the variable.
+          example: Base URL for all requests in this collection.
+        disabled:
+          type: boolean
+          description: When `true` the variable is ignored by the runner.
+          example: false
+    V3Item:
+      type: object
+      description: |-
+        A folder (when `item` is present) or a request leaf (when `request`
+        is present) inside a collection.
+      properties:
+        name:
+          type: string
+          description: Display name of the folder or request.
+          example: List Pets
+        description:
+          type: string
+          description: Description of the folder or request.
+          example: Returns a paginated list of pets.
+        item:
+          type: array
+          description: Child items — present only on folder nodes.
+          items:
+            $ref: '#/components/schemas/V3Item'
+        request:
+          $ref: '#/components/schemas/V3Request'
+        event:
+          type: array
+          description: Pre-request and test scripts attached to this item.
+          items:
+            $ref: '#/components/schemas/V3Event'
+        auth:
+          $ref: '#/components/schemas/V3Auth'
+        response:
+          type: array
+          description: Saved example responses for this request.
+          items:
+            $ref: '#/components/schemas/V3Response'
+    V3Request:
+      type: object
+      description: HTTP request definition.
+      properties:
+        method:
+          type: string
+          description: HTTP method in upper-case.
+          example: GET
+        url:
+          description: Request URL — either a plain string or a structured URL object.
+          oneOf:
+            - type: string
+              example: 'https://api.example.com/pets?limit=10'
+            - $ref: '#/components/schemas/V3Url'
+        description:
+          type: string
+          description: Human-readable description of what the request does.
+          example: Returns a paginated list of pets.
+        header:
+          type: array
+          description: Request headers.
+          items:
+            $ref: '#/components/schemas/V3Header'
+        body:
+          $ref: '#/components/schemas/V3Body'
+        auth:
+          $ref: '#/components/schemas/V3Auth'
+    V3Url:
+      type: object
+      description: Structured URL representation used by the Postman v3 format.
+      properties:
+        raw:
+          type: string
+          description: The full URL as a string (used for display and fallback parsing).
+          example: 'https://api.example.com/pets/{{petId}}'
+        protocol:
+          type: string
+          description: URL scheme without the colon/slashes.
+          example: https
+        host:
+          description: Hostname segments as an array or a single string.
+          oneOf:
+            - type: string
+            - type: array
+              items:
+                type: string
+          example:
+            - api
+            - example
+            - com
+        path:
+          description: Path segments as an array or a single string.
+          oneOf:
+            - type: string
+            - type: array
+              items:
+                type: string
+          example:
+            - pets
+            - '{{petId}}'
+        port:
+          type: string
+          description: Port number as a string.
+          example: '3000'
+        query:
+          type: array
+          description: Query string parameters.
+          items:
+            $ref: '#/components/schemas/V3QueryParam'
+        variable:
+          type: array
+          description: Path variable definitions (e.g. for `{{petId}}`).
+          items:
+            $ref: '#/components/schemas/V3PathVariable'
+    V3Header:
+      type: object
+      description: An HTTP request header.
+      properties:
+        key:
+          type: string
+          description: Header name.
+          example: Content-Type
+        value:
+          type: string
+          description: Header value.
+          example: application/json
+        description:
+          type: string
+          description: Human-readable description of the header's purpose.
+          example: Specifies the media type of the request body.
+        disabled:
+          type: boolean
+          description: When `true` the header is not sent.
+          example: false
+    V3QueryParam:
+      type: object
+      description: A URL query parameter.
+      properties:
+        key:
+          type: string
+          description: Parameter name.
+          example: limit
+        value:
+          type: string
+          description: Parameter value.
+          example: '10'
+        description:
+          type: string
+          description: Human-readable description of the parameter.
+          example: Maximum number of results to return.
+        disabled:
+          type: boolean
+          description: When `true` the parameter is excluded from the URL.
+          example: false
+    V3PathVariable:
+      type: object
+      description: A path variable definition (e.g. `{{petId}}` in the URL path).
+      properties:
+        key:
+          type: string
+          description: Variable name (without the `{{` `}}` delimiters).
+          example: petId
+        value:
+          type: string
+          description: Default or example value.
+          example: '42'
+        description:
+          type: string
+          description: Human-readable description of the path variable.
+          example: Unique identifier of the pet.
+    V3Body:
+      type: object
+      description: Request body definition.
+      properties:
+        mode:
+          type: string
+          description: Body encoding mode.
+          enum:
+            - raw
+            - urlencoded
+            - formdata
+            - file
+            - graphql
+          example: raw
+        raw:
+          type: string
+          description: Raw body content (used when `mode` is `"raw"`).
+          example: '{"name":"Rex","species":"dog"}'
+        options:
+          type: object
+          description: Additional options for the body (e.g. language hint for raw mode).
+          properties:
+            raw:
+              type: object
+              properties:
+                language:
+                  type: string
+                  description: Language hint for syntax highlighting.
+                  enum:
+                    - json
+                    - xml
+                    - text
+                    - html
+                    - javascript
+                  example: json
+        urlencoded:
+          type: array
+          description: URL-encoded form fields (used when `mode` is `"urlencoded"`).
+          items:
+            $ref: '#/components/schemas/KeyValuePair'
+        formdata:
+          type: array
+          description: Multipart form fields (used when `mode` is `"formdata"`).
+          items:
+            $ref: '#/components/schemas/KeyValuePair'
+    V3Event:
+      type: object
+      description: A pre-request or test script attached to a collection, folder, or request.
+      properties:
+        listen:
+          type: string
+          description: Event type — `"prerequest"` or `"test"`.
+          enum:
+            - prerequest
+            - test
+          example: test
+        script:
+          type: object
+          description: Script definition.
+          properties:
+            type:
+              type: string
+              description: MIME type of the script (always `"text/javascript"`).
+              example: text/javascript
+            exec:
+              description: Script source — either a single string or an array of lines.
+              oneOf:
+                - type: string
+                - type: array
+                  items:
+                    type: string
+              example:
+                - 'pm.test(''status is 200'', () => pm.response.to.have.status(200));'
+        disabled:
+          type: boolean
+          description: When `true` the script is not executed.
+          example: false
+    V3Response:
+      type: object
+      description: A saved example response attached to a request item.
+      properties:
+        name:
+          type: string
+          description: Display name of the saved response.
+          example: 200 OK – list of pets
+        status:
+          type: string
+          description: HTTP status text.
+          example: OK
+        code:
+          type: integer
+          description: HTTP status code.
+          example: 200
+        body:
+          type: string
+          description: Response body as a string.
+          example: '[{"id":1,"name":"Rex","species":"dog"}]'
+        header:
+          type: array
+          description: Response headers.
+          items:
+            $ref: '#/components/schemas/V3Header'
+    KeyValuePair:
+      type: object
+      description: A generic key-value pair used in auth configs, headers, and form fields.
+      properties:
+        key:
+          type: string
+          description: The key / parameter name.
+          example: token
+        value:
+          type: string
+          description: The value.
+          example: '{{apiToken}}'
+        description:
+          type: string
+          description: Optional human-readable description.
+          example: Bearer token for API authentication.
+    # ── Score Responses ───────────────────────────────────────────────────────
+    FullScoreResponse:
+      type: object
+      description: Response body returned by `POST /score`.
+      required:
+        - inputFormat
+        - report
+      properties:
+        inputFormat:
+          type: string
+          description: The format that was detected or specified for the input collection.
+          enum:
+            - json
+            - yaml
+            - auto
+          example: json
+        report:
+          $ref: '#/components/schemas/QualityReport'
+    SummaryScoreResponse:
+      type: object
+      description: Compact response body returned by `POST /score/summary`.
+      required:
+        - collectionName
+        - overallScore
+        - grade
+        - summary
+        - categories
+      properties:
+        collectionName:
+          type: string
+          description: Name of the scored collection.
+          example: Sample Pets API
+        overallScore:
+          type: integer
+          description: Weighted overall quality score from 0 to 100.
+          minimum: 0
+          maximum: 100
+          example: 62
+        grade:
+          type: string
+          description: Letter grade derived from `overallScore`.
+          enum:
+            - A
+            - B
+            - C
+            - D
+            - F
+          example: C
+        summary:
+          $ref: '#/components/schemas/ScoreSummary'
+        categories:
+          type: array
+          description: Per-category scores (id, label, weight, score only).
+          items:
+            $ref: '#/components/schemas/CategorySummary'
+    QualityReport:
+      type: object
+      description: Full quality report returned inside `FullScoreResponse.report`.
+      required:
+        - schema
+        - collectionName
+        - overallScore
+        - grade
+        - summary
+        - categories
+        - topRecommendations
+      properties:
+        schema:
+          type: string
+          description: Detected collection schema version.
+          example: v3
+        collectionName:
+          type: string
+          description: Name of the scored collection.
+          example: Sample Pets API
+        overallScore:
+          type: integer
+          description: Weighted overall quality score from 0 to 100.
+          minimum: 0
+          maximum: 100
+          example: 62
+        grade:
+          type: string
+          description: Letter grade derived from `overallScore`.
+          enum:
+            - A
+            - B
+            - C
+            - D
+            - F
+          example: C
+        summary:
+          $ref: '#/components/schemas/ScoreSummary'
+        categories:
+          type: array
+          description: Detailed results for each of the six scoring categories.
+          items:
+            $ref: '#/components/schemas/CategoryResult'
+        topRecommendations:
+          type: array
+          description: |-
+            Up to five prioritised recommendations derived from the lowest-scoring
+            categories.  Each string is formatted as
+            `"<Category> (<score>/100): <finding message>"`.
+          maxItems: 5
+          items:
+            type: string
+          example:
+            - 'Best Practices (variables, examples, consistency) (40/100): No collection variables defined.'
+    ScoreSummary:
+      type: object
+      description: High-level counts of endpoints, folders, and findings.
+      required:
+        - endpoints
+        - folders
+        - totalFindings
+        - errorFindings
+        - warnFindings
+      properties:
+        endpoints:
+          type: integer
+          description: Total number of request endpoints found in the collection.
+          example: 2
+        folders:
+          type: integer
+          description: Total number of folder nodes in the collection.
+          example: 0
+        totalFindings:
+          type: integer
+          description: Total number of findings across all categories.
+          example: 5
+        errorFindings:
+          type: integer
+          description: Number of findings with level `"error"`.
+          example: 0
+        warnFindings:
+          type: integer
+          description: Number of findings with level `"warn"`.
+          example: 3
+    CategoryResult:
+      type: object
+      description: Detailed scoring result for a single category.
+      required:
+        - id
+        - label
+        - weight
+        - score
+        - maxScore
+        - findings
+        - metrics
+      properties:
+        id:
+          type: string
+          description: Machine-readable category identifier.
+          enum:
+            - endpoint_structure
+            - annotations
+            - auth
+            - best_practices
+            - tests
+            - documentation
+          example: auth
+        label:
+          type: string
+          description: Human-readable category name.
+          example: 'Authentication & Security'
+        weight:
+          type: number
+          format: float
+          description: Fractional weight of this category in the overall score.
+          example: 0.20
+        score:
+          type: integer
+          description: Category score from 0 to 100.
+          minimum: 0
+          maximum: 100
+          example: 88
+        maxScore:
+          type: integer
+          description: Always 100.
+          enum:
+            - 100
+          example: 100
+        findings:
+          type: array
+          description: Individual findings (issues or observations) for this category.
+          items:
+            $ref: '#/components/schemas/Finding'
+        metrics:
+          type: object
+          description: |-
+            Raw numeric/boolean metrics used to compute the category score.
+            The exact keys vary by category — see the category descriptions
+            in the service info endpoint for details.
+          additionalProperties:
+            oneOf:
+              - type: number
+              - type: string
+              - type: boolean
+          example:
+            collectionAuth: bearer
+            endpointsWithAuth: 2
+            hardcodedCredentials: 0
+            insecureSchemeEndpoints: 0
+    CategorySummary:
+      type: object
+      description: Compact per-category result returned by `POST /score/summary`.
+      required:
+        - id
+        - label
+        - weight
+        - score
+      properties:
+        id:
+          type: string
+          description: Machine-readable category identifier.
+          example: tests
+        label:
+          type: string
+          description: Human-readable category name.
+          example: 'Tests & Coverage'
+        weight:
+          type: number
+          format: float
+          description: Fractional weight of this category in the overall score.
+          example: 0.20
+        score:
+          type: integer
+          description: Category score from 0 to 100.
+          minimum: 0
+          maximum: 100
+          example: 70
+    Finding:
+      type: object
+      description: A single finding (issue or observation) produced by a scoring category.
+      required:
+        - level
+        - message
+      properties:
+        level:
+          type: string
+          description: |-
+            Severity level of the finding.
+            - `error` – a definite quality problem (e.g. hardcoded secret, missing URL)
+            - `warn` – a best-practice violation worth fixing
+            - `info` – an informational observation or minor suggestion
+          enum:
+            - error
+            - warn
+            - info
+          example: warn
+        message:
+          type: string
+          description: Human-readable description of the finding.
+          example: 'Raw body present but no Content-Type header'
+        path:
+          type: string
+          description: |-
+            Breadcrumb path to the collection item that triggered the finding
+            (folder names joined by ` / `, ending with the request name).
+            Omitted for collection-level findings.
+          example: 'Score Collection (JSON) / Create Pet'
+    ErrorResponse:
+      type: object
+      description: Error response returned for invalid or unparseable input (HTTP 400).
+      required:
+        - error
+        - details
+      properties:
+        error:
+          type: string
+          description: Short error category message.
+          example: Failed to compute score
+        details:
+          type: string
+          description: Detailed error message from the underlying parser or scorer.
+          example: 'Unsupported or empty request body. Send JSON or YAML collection.'
