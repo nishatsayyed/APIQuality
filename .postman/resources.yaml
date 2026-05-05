@@ -6,7 +6,6 @@ workspace:
 
 cloudResources:
   specs:
-    ../postman/specs/api-quality-score-service.yaml: 9d05ae2d-84dc-44ee-b3e5-65411ba07ebe
     ../index.yaml: ace3b951-f840-4661-bb23-df5ea11e4081
 
 localResources:
