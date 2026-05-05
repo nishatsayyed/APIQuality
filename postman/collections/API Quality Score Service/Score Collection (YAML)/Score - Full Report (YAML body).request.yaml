@@ -1,0 +1,39 @@
+$kind: http-request
+name: Score - Full Report (YAML body)
+method: POST
+url: '{{baseUrl}}/score'
+order: 1000
+headers:
+  - key: Content-Type
+    value: application/x-yaml
+body:
+  type: text
+  content: |-
+    info:
+      name: Sample Pets API (YAML)
+      description: YAML version of the sample collection.
+    item:
+      - name: List Pets
+        request:
+          method: GET
+          url: https://api.example.com/pets
+          description: Returns a list of pets.
+        event:
+          - listen: test
+            script:
+              exec:
+                - pm.test('ok', () => pm.response.to.have.status(200));
+scripts:
+  - type: afterResponse
+    language: text/javascript
+    code: |-
+      pm.test('status is 200', function () {
+        pm.response.to.have.status(200);
+      });
+      const json = pm.response.json();
+      pm.test("inputFormat === 'yaml'", function () {
+        pm.expect(json.inputFormat).to.eql('yaml');
+      });
+      pm.test('report.overallScore is a number', function () {
+        pm.expect(json.report.overallScore).to.be.a('number');
+      });

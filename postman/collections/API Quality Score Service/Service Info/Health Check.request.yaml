@@ -1,0 +1,20 @@
+$kind: http-request
+name: Health Check
+method: GET
+url: '{{baseUrl}}/health'
+order: 2000
+scripts:
+  - type: afterResponse
+    language: text/javascript
+    code: |-
+      pm.test('status is 200', function () {
+        pm.response.to.have.status(200);
+      });
+      pm.test("status === 'ok'", function () {
+        const json = pm.response.json();
+        pm.expect(json.status).to.eql('ok');
+      });
+      pm.test('time is a string', function () {
+        const json = pm.response.json();
+        pm.expect(json.time).to.be.a('string');
+      });

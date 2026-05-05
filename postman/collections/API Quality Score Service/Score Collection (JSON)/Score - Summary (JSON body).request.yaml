@@ -1,0 +1,62 @@
+$kind: http-request
+name: Score - Summary (JSON body)
+method: POST
+url: '{{baseUrl}}/score/summary'
+order: 2000
+headers:
+  - key: Content-Type
+    value: application/json
+body:
+  type: json
+  content: |-
+    {
+      "info": { "name": "Sample Pets API", "description": "A tiny sample collection for quality scoring." },
+      "auth": { "type": "bearer", "bearer": [{ "key": "token", "value": "{{apiToken}}" }] },
+      "item": [
+        {
+          "name": "List Pets",
+          "request": {
+            "method": "GET",
+            "url": "https://api.example.com/pets?limit=10",
+            "description": "Returns a paginated list of pets.",
+            "header": [{ "key": "Accept", "value": "application/json", "description": "Response content type" }]
+          },
+          "event": [
+            { "listen": "test", "script": { "exec": ["pm.test('status is 200', () => pm.response.to.have.status(200));", "pm.test('body is array', () => pm.expect(pm.response.json()).to.be.an('array'));"] } }
+          ]
+        },
+        {
+          "name": "Create Pet",
+          "request": {
+            "method": "POST",
+            "url": "https://api.example.com/pets",
+            "description": "Creates a new pet.",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": { "mode": "raw", "raw": "{\n  \"name\": \"Rex\",\n  \"species\": \"dog\"\n}" }
+          },
+          "event": [
+            { "listen": "test", "script": { "exec": ["pm.test('status is 201', () => pm.response.to.have.status(201));"] } }
+          ]
+        }
+      ]
+    }
+scripts:
+  - type: afterResponse
+    language: text/javascript
+    code: |-
+      pm.test('status is 200', function () {
+        pm.response.to.have.status(200);
+      });
+      const json = pm.response.json();
+      pm.test('overallScore is a number', function () {
+        pm.expect(json.overallScore).to.be.a('number');
+      });
+      pm.test('grade is a string', function () {
+        pm.expect(json.grade).to.be.a('string');
+      });
+      pm.test('categories array length 6', function () {
+        pm.expect(json.categories).to.be.an('array').with.lengthOf(6);
+      });
+      pm.test('summary object exists', function () {
+        pm.expect(json.summary).to.be.an('object');
+      });
