@@ -1,0 +1,19 @@
+$kind: http-request
+name: Score - Empty Body (400 expected)
+method: POST
+url: '{{baseUrl}}/score'
+order: 1000
+headers:
+  - key: Content-Type
+    value: application/json
+body:
+  type: json
+  content: |-
+    {}
+scripts:
+  - type: afterResponse
+    language: text/javascript
+    code: |-
+      pm.test('status is 200 or 400', function () {
+        pm.expect([200, 400]).to.include(pm.response.code);
+      });

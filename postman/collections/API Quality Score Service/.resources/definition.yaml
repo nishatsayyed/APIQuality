@@ -1,0 +1,7 @@
+$kind: collection
+name: API Quality Score Service
+description: Collection that documents and exercises the local API Quality Score Service running at http://localhost:3000.
+variables:
+  - key: baseUrl
+    value: 'http://localhost:3000'
+    description: Base URL of the local API Quality Score Service

@@ -1,0 +1,22 @@
+$kind: http-request
+name: Score - Invalid YAML (400 expected)
+method: POST
+url: '{{baseUrl}}/score'
+order: 2000
+headers:
+  - key: Content-Type
+    value: application/x-yaml
+body:
+  type: text
+  content: 'this: is: not: valid: yaml: [[['
+scripts:
+  - type: afterResponse
+    language: text/javascript
+    code: |-
+      pm.test('status is 400', function () {
+        pm.response.to.have.status(400);
+      });
+      pm.test('response has error field', function () {
+        const json = pm.response.json();
+        pm.expect(json).to.have.property('error');
+      });
