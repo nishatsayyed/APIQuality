@@ -30,9 +30,14 @@ jobs:
       - name: Start service
         working-directory: ./service
         run: |
-          npm start &
+          nohup npm start > service.log 2>&1 &
           echo $! > service.pid
-          # Wait for the service to be ready on port 3000
+          disown
+          echo "Launched service with PID $(cat service.pid)"
+
+      - name: Wait for service to be ready
+        working-directory: ./service
+        run: |
           for i in {1..30}; do
             if curl -sSf http://localhost:3000/health > /dev/null; then
               echo "Service is up"
@@ -41,11 +46,9 @@ jobs:
             echo "Waiting for service... ($i)"
             sleep 1
           done
-          echo "Service failed to start in time"
+          echo "Service failed to start in time. Logs:"
+          cat service.log || true
           exit 1
-
-      - name: Checkout repository
-        uses: actions/checkout@v4
 
       - name: Add Postman CLI to PATH
         run: echo "$HOME/.postman" >> $GITHUB_PATH
