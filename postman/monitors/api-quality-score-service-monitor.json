@@ -1,0 +1,42 @@
+{
+  "monitor": {
+    "name": "API Quality Score Service Monitor",
+    "schedule": {
+      "cron": "*/5 * * * *",
+      "timezone": "America/Los_Angeles"
+    },
+    "collection": "API Quality Score Service",
+    "environment": null,
+    "notifications": {
+      "onError": [
+        { "email": "shubhi.srivastava@postman.com" }
+      ],
+      "onFailure": [
+        { "email": "shubhi.srivastava@postman.com" }
+      ]
+    },
+    "distribution": ["us-east"],
+    "options": {
+      "strictSSL": true,
+      "followRedirects": true,
+      "requestTimeout": 30000,
+      "requestDelay": 0,
+      "haltOnError": false
+    }
+  },
+  "_comments": {
+    "name": "Human-readable name for the monitor.",
+    "schedule.cron": "Standard cron expression. '*/5 * * * *' = every 5 minutes.",
+    "schedule.timezone": "IANA timezone used to evaluate the cron expression.",
+    "collection": "Name or UID of the collection to run. Replace with the Postman cloud UID (format: '<number>-<uuid>') once the collection is synced to Postman Cloud.",
+    "environment": "Optional environment UID to use during the monitor run. Set to null if none.",
+    "notifications.onError": "Emails notified when the monitor run errors out.",
+    "notifications.onFailure": "Emails notified when one or more requests/tests fail.",
+    "distribution": "Regions the monitor runs from. Options: 'us-east', 'us-west', 'eu-central', 'ap-south', 'ap-southeast', 'ap-northeast'.",
+    "options.strictSSL": "Enforce SSL certificate validation.",
+    "options.followRedirects": "Follow HTTP redirects automatically.",
+    "options.requestTimeout": "Per-request timeout in milliseconds.",
+    "options.requestDelay": "Delay between requests in milliseconds.",
+    "options.haltOnError": "Stop the run on the first error when true."
+  }
+}

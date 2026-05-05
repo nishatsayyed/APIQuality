@@ -1,0 +1,5 @@
+$kind: collection
+name: List Scoring Categories Monitor Collection
+variables:
+  - key: baseUrl
+    value: 'http://localhost:3000'
