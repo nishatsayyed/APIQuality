@@ -44,6 +44,9 @@ jobs:
           echo "Service failed to start in time"
           exit 1
 
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
       - name: Add Postman CLI to PATH
         run: echo "$HOME/.postman" >> $GITHUB_PATH
 
