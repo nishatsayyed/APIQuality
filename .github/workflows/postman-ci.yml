@@ -14,11 +14,13 @@ jobs:
       - name: Checkout repository
         uses: actions/checkout@v4
 
-      - name: Install Postman CLI
-        run: |
-          run: curl -o- "https://dl-cli.pstmn-beta.io/install/unix.sh" | sh
+      - name: Add Postman CLI to PATH
+        run: echo "$HOME/.postman" >> $GITHUB_PATH
 
-      - name: Login to Postman CLI
+      - name: Install Postman CLI
+        run: curl -o- "https://dl-cli.pstmn-beta.io/install/unix.sh" | sh
+
+      - name: Authenticate Postman CLI
         run: postman login --with-api-key ${{ secrets.POSTMAN_API_KEY }}
 
       - name: Run API Quality Score Service collection
