@@ -2,17 +2,27 @@ name: Postman Collection Run
 
 on:
   push:
-    branches: [main]
-  pull_request:
-    branches: [main]
-  workflow_dispatch:
+    branches:
+      - main
 
 jobs:
   postman-tests:
     runs-on: ubuntu-latest
+    env:
+      POSTMAN_CHANNEL: beta
+
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
+
+      - name: Add Postman CLI to PATH
+        run: echo "$HOME/.postman" >> $GITHUB_PATH
+
+      - name: Install Postman CLI
+        run: curl -o- "https://dl-cli.pstmn-beta.io/install/unix.sh" | sh
+
+      - name: Authenticate Postman CLI
+        run: postman login --with-api-key ${{ secrets.POSTMAN_API_KEY }}
 
       - name: Set up Node.js
         uses: actions/setup-node@v4
@@ -27,7 +37,7 @@ jobs:
         working-directory: ./service
         run: npm run build
 
-      - name: Start service
+      - name: Start service on localhost:3000
         working-directory: ./service
         run: |
           nohup npm start > service.log 2>&1 &
@@ -50,22 +60,7 @@ jobs:
           cat service.log || true
           exit 1
 
-      - name: Add Postman CLI to PATH
-        run: echo "$HOME/.postman" >> $GITHUB_PATH
-
-      - name: Install Postman CLI
-        run: |
-          curl -o- "https://dl-cli.pstmn-beta.io/install/unix.sh" | sh
-          export PATH="$HOME/.postman:$PATH"
-
-      - name: Authenticate Postman CLI
-        env:
-          PATH: ${{ env.PATH }}:$HOME/.postman
-        run: postman login --with-api-key ${{ secrets.POSTMAN_API_KEY }}
-
       - name: Run API Quality Score Service collection
-        env:
-          PATH: ${{ env.PATH }}:$HOME/.postman
         run: |
           postman collection run "1110081-abc03db5-abb6-448f-b10a-a3280d930938" \
             -e "1109466-25f7c205-0bbe-4a25-b78c-7806c396e274"
