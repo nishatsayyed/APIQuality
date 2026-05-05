@@ -1,0 +1,61 @@
+$kind: http-request
+name: Score - Full Report (JSON body)
+method: POST
+url: '{{baseUrl}}/score'
+order: 1000
+headers:
+  - key: Content-Type
+    value: application/json
+body:
+  type: json
+  content: |-
+    {
+      "info": { "name": "Sample Pets API", "description": "A tiny sample collection for quality scoring." },
+      "auth": { "type": "bearer", "bearer": [{ "key": "token", "value": "{{apiToken}}" }] },
+      "item": [
+        {
+          "name": "List Pets",
+          "request": {
+            "method": "GET",
+            "url": "https://api.example.com/pets?limit=10",
+            "description": "Returns a paginated list of pets.",
+            "header": [{ "key": "Accept", "value": "application/json", "description": "Response content type" }]
+          },
+          "event": [
+            { "listen": "test", "script": { "exec": ["pm.test('status is 200', () => pm.response.to.have.status(200));", "pm.test('body is array', () => pm.expect(pm.response.json()).to.be.an('array'));"] } }
+          ]
+        },
+        {
+          "name": "Create Pet",
+          "request": {
+            "method": "POST",
+            "url": "https://api.example.com/pets",
+            "description": "Creates a new pet.",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": { "mode": "raw", "raw": "{\n  \"name\": \"Rex\",\n  \"species\": \"dog\"\n}" }
+          },
+          "event": [
+            { "listen": "test", "script": { "exec": ["pm.test('status is 201', () => pm.response.to.have.status(201));"] } }
+          ]
+        }
+      ]
+    }
+scripts:
+  - type: afterResponse
+    language: text/javascript
+    code: |-
+      pm.test('status is 200', function () {
+        pm.response.to.have.status(200);
+      });
+      const json = pm.response.json();
+      pm.test('report.overallScore is a number between 0 and 100', function () {
+        pm.expect(json.report.overallScore).to.be.a('number');
+        pm.expect(json.report.overallScore).to.be.at.least(0);
+        pm.expect(json.report.overallScore).to.be.at.most(100);
+      });
+      pm.test('report.grade is a string', function () {
+        pm.expect(json.report.grade).to.be.a('string');
+      });
+      pm.test('report.categories has length 6', function () {
+        pm.expect(json.report.categories).to.be.an('array').with.lengthOf(6);
+      });
