@@ -14,6 +14,36 @@ jobs:
       - name: Checkout repository
         uses: actions/checkout@v4
 
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+
+      - name: Install service dependencies
+        working-directory: ./service
+        run: npm install
+
+      - name: Build service
+        working-directory: ./service
+        run: npm run build
+
+      - name: Start service
+        working-directory: ./service
+        run: |
+          npm start &
+          echo $! > service.pid
+          # Wait for the service to be ready on port 3000
+          for i in {1..30}; do
+            if curl -sSf http://localhost:3000/health > /dev/null; then
+              echo "Service is up"
+              exit 0
+            fi
+            echo "Waiting for service... ($i)"
+            sleep 1
+          done
+          echo "Service failed to start in time"
+          exit 1
+
       - name: Add Postman CLI to PATH
         run: echo "$HOME/.postman" >> $GITHUB_PATH
 
@@ -27,3 +57,11 @@ jobs:
         run: |
           postman collection run "1110081-abc03db5-abb6-448f-b10a-a3280d930938" \
             -e "1109466-25f7c205-0bbe-4a25-b78c-7806c396e274"
+
+      - name: Stop service
+        if: always()
+        working-directory: ./service
+        run: |
+          if [ -f service.pid ]; then
+            kill "$(cat service.pid)" || true
+          fi
