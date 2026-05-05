@@ -54,12 +54,18 @@ jobs:
         run: echo "$HOME/.postman" >> $GITHUB_PATH
 
       - name: Install Postman CLI
-        run: curl -o- "https://dl-cli.pstmn-beta.io/install/unix.sh" | sh
+        run: |
+          curl -o- "https://dl-cli.pstmn-beta.io/install/unix.sh" | sh
+          export PATH="$HOME/.postman:$PATH"
 
       - name: Authenticate Postman CLI
+        env:
+          PATH: ${{ env.PATH }}:$HOME/.postman
         run: postman login --with-api-key ${{ secrets.POSTMAN_API_KEY }}
 
       - name: Run API Quality Score Service collection
+        env:
+          PATH: ${{ env.PATH }}:$HOME/.postman
         run: |
           postman collection run "1110081-abc03db5-abb6-448f-b10a-a3280d930938" \
             -e "1109466-25f7c205-0bbe-4a25-b78c-7806c396e274"
