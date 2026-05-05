@@ -15,6 +15,9 @@ jobs:
       - name: Checkout repository
         uses: actions/checkout@v4
 
+      - name: Add Postman CLI to PATH
+        run: echo "$HOME/.postman" >> $GITHUB_PATH
+
       - name: Install Postman CLI
         run: curl -o- "https://dl-cli.pstmn-beta.io/install/unix.sh" | sh
 
