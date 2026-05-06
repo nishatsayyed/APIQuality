@@ -22,7 +22,7 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          curl -fsSL "https://dl-cli.pstmn-beta.io/install/unix.sh" | sh
+          curl -fsSL "https://dl-cli.pstmn-beta.io/install/unix.sh" | bash
 
           export PATH="$HOME/.postman:$HOME/.local/bin:$PATH"
           command -v postman
