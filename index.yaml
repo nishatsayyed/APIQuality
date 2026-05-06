@@ -73,6 +73,7 @@ paths:
                     description: Compact summary of the quality score
   /health:
     get:
+      summary: Health Check
       description: |-
         Liveness probe. Returns `{ "status": "ok" }` and the current server
         timestamp. Use this to verify the service is running before sending
