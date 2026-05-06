@@ -18,11 +18,16 @@ jobs:
       - name: Add Postman CLI to PATH
         run: echo "$HOME/.postman" >> $GITHUB_PATH
 
-      - name: Install Postman CLI
-        run: curl -o- "https://dl-cli.pstmn-beta.io/install/unix.sh" | sh
+      - name: Install and authenticate Postman CLI
+        shell: bash
+        run: |
+          set -euo pipefail
+          curl -fsSL "https://dl-cli.pstmn-beta.io/install/unix.sh" | sh
 
-      - name: Authenticate Postman CLI
-        run: postman login --with-api-key ${{ secrets.POSTMAN_API_KEY }}
+          export PATH="$HOME/.postman:$HOME/.local/bin:$PATH"
+          command -v postman
+          postman --version
+          postman login --with-api-key "${{ secrets.POSTMAN_API_KEY }}"
 
       - name: Lint OpenAPI spec
         run: postman spec lint index.yaml
