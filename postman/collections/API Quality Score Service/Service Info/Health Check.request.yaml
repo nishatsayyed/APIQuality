@@ -12,7 +12,7 @@ scripts:
       });
       pm.test("status === 'ok'", function () {
         const json = pm.response.json();
-        pm.expect(json.status).to.eql('ok');
+        pm.expect(json.status).to.eql('healthy');
       });
       pm.test('time is a string', function () {
         const json = pm.response.json();
