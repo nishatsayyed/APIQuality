@@ -1,0 +1,27 @@
+name: Lint Postman Spec
+
+on:
+  pull_request:
+    branches:
+      - main
+
+jobs:
+  postman-spec-lint:
+    runs-on: ubuntu-latest
+    env:
+      POSTMAN_CHANNEL: beta
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Install Postman CLI
+        run: |
+          chmod +x .github/scripts/install-postman-cli.sh
+          .github/scripts/install-postman-cli.sh
+
+      - name: Authenticate Postman CLI
+        run: postman login --with-api-key ${{ secrets.POSTMAN_API_KEY }}
+
+      - name: Lint OpenAPI spec
+        run: postman spec lint index.yaml
