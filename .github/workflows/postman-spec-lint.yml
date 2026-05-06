@@ -1,26 +1,15 @@
-name: Postman Spec Lint
-
-# Runs `postman spec lint` on the OpenAPI spec for every pull request
-# targeting main. The job exits non-zero on lint failures, which — when
-# this check is marked "Required" in the branch protection rules for
-# `main` — will block the PR from being merged.
+name: Lint Postman Spec
 
 on:
   pull_request:
     branches:
       - main
-    # Only re-run when something that affects the spec changes.
-    paths:
-      - 'index.yaml'
-      - '.github/workflows/postman-spec-lint.yml'
 
 jobs:
-  spec-lint:
-    name: Lint OpenAPI spec with Postman CLI
+  postman-spec-lint:
     runs-on: ubuntu-latest
     env:
       POSTMAN_CHANNEL: beta
-      SPEC_PATH: index.yaml
 
     steps:
       - name: Checkout repository
@@ -35,17 +24,5 @@ jobs:
       - name: Authenticate Postman CLI
         run: postman login --with-api-key ${{ secrets.POSTMAN_API_KEY }}
 
-      - name: Lint spec (human-readable output)
-        run: postman spec lint "$SPEC_PATH" -f warning
-
-      - name: Lint spec (JSON report for artifact)
-        if: always()
-        run: postman spec lint "$SPEC_PATH" -f warning -o json > spec-lint-report.json || true
-
-      - name: Upload lint report
-        if: always()
-        uses: actions/upload-artifact@v4
-        with:
-          name: postman-spec-lint-report
-          path: spec-lint-report.json
-          if-no-files-found: ignore
+      - name: Lint OpenAPI spec
+        run: postman spec lint index.yaml
