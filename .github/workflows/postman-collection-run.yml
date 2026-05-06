@@ -58,7 +58,7 @@ jobs:
 
       - name: Run API Quality Score Service collection
         run: |
-          postman collection run "1110081-abc03db5-abb6-448f-b10a-a3280d930938" \
+          postman collection run postman/collections/API\ Quality\ Score\ Service \
             -e "1109466-25f7c205-0bbe-4a25-b78c-7806c396e274" \
             --report-events
 
