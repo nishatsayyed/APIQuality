@@ -197,13 +197,20 @@ install_unix() {
 
         # Try curl first, then wget
         if command -v curl >/dev/null 2>&1; then
-            # Always show download progress (curl shows progress by default)
-            curl --location --retry 10 --output "$archive_file" "$url" || report_crash "Failed to download Postman CLI" "$os_tag" "$url"
+            # --fail ensures HTTP 4xx/5xx cause curl to exit non-zero (instead of saving HTML error pages)
+            # --retry-all-errors retries on those HTTP errors too, not just transport errors
+            curl --fail --location --retry 10 --retry-all-errors --retry-delay 5 --output "$archive_file" "$url" || report_crash "Failed to download Postman CLI" "$os_tag" "$url"
         elif command -v wget >/dev/null 2>&1; then
-            # Always show download progress (wget shows progress by default)
-            wget --output-document "$archive_file" "$url" || report_crash "Failed to download Postman CLI" "$os_tag" "$url"
+            # --tries=10 + --waitretry=5 mirrors curl retry behaviour; wget already fails on 4xx/5xx by default
+            wget --tries=10 --waitretry=5 --output-document "$archive_file" "$url" || report_crash "Failed to download Postman CLI" "$os_tag" "$url"
         else
             report_crash "You need either cURL or wget installed on your system" "$os_tag" "$url"
+        fi
+
+        # Validate the download is actually a gzip archive (magic bytes: 1f 8b) before extracting.
+        # Guards against CDN returning an HTML error page with a 200 status.
+        if ! (head -c 2 "$archive_file" | od -An -tx1 | tr -d ' \n' | grep -q '^1f8b'); then
+            report_crash "Downloaded file is not a valid gzip archive (CDN likely returned an error page)" "$os_tag" "$url"
         fi
 
         print_msg info "Extracting tar.gz archive..."
@@ -215,10 +222,15 @@ install_unix() {
         archive_file="$tmp_dir/postman-cli.zip"
 
         if command -v curl >/dev/null 2>&1; then
-            # Always show download progress (curl shows progress by default)
-            curl --location --retry 10 --output "$archive_file" "$url" || report_crash "Failed to download Postman CLI" "$os_tag" "$url"
+            # --fail + --retry-all-errors: retry on HTTP 4xx/5xx instead of saving an HTML error page
+            curl --fail --location --retry 10 --retry-all-errors --retry-delay 5 --output "$archive_file" "$url" || report_crash "Failed to download Postman CLI" "$os_tag" "$url"
         else
             report_crash "curl is required for macOS installation" "$os_tag" "$url"
+        fi
+
+        # Validate the download is actually a zip archive (magic bytes: 50 4b) before extracting.
+        if ! (head -c 2 "$archive_file" | od -An -tx1 | tr -d ' \n' | grep -q '^504b'); then
+            report_crash "Downloaded file is not a valid zip archive (CDN likely returned an error page)" "$os_tag" "$url"
         fi
 
         print_msg info "Extracting zip archive..."
